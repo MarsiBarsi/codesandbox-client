@@ -339,6 +339,9 @@ async function initializeManager(
   customNpmRegistries.forEach(registry => {
     const cleanUrl = registry.registryUrl.replace(/\/$/, '');
 
+    (window as any).tarRegistry = (registry as any).tarRegistry;
+    (window as any).customNpmRegistry = cleanUrl;
+
     const options: NpmRegistryOpts = { proxyEnabled: registry.proxyEnabled };
 
     if (registry.limitToScopes) {
@@ -364,7 +367,10 @@ async function initializeManager(
 
     newManager.prependNpmProtocolDefinition({
       protocol,
-      condition: protocol.condition,
+      condition: (a, version, c, useLocal) =>
+        useLocal &&
+        !version.startsWith((window as any).tarRegistry) &&
+        protocol.condition(a, version, c, useLocal),
     });
   });
 

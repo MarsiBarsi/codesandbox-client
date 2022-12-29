@@ -8,6 +8,13 @@ type DeserializedFetchedTar = {
   content: string;
 };
 
+function prepareLocalUrl(url: string) {
+  return url.replace(
+    (window as any).tarRegistry,
+    (window as any).customNpmRegistry.replace('npm', 'npm-d/')
+  );
+}
+
 /**
  * Responsible for fetching, caching and converting tars to a structure that sandpack
  * understands and can use
@@ -36,9 +43,11 @@ export class TarStore implements FetchProtocol {
     const tarKey = this.generateKey(name, version);
 
     this.fetchedTars[tarKey] = (async () => {
-      const file = await fetchWithRetries(version, 6, requestInit).then(x =>
-        x.arrayBuffer()
-      );
+      const file = await fetchWithRetries(
+        prepareLocalUrl(version),
+        4,
+        requestInit
+      ).then(x => x.arrayBuffer());
       const untarredFile = await untar(file);
       const normalizedTar = this.normalizeTar(untarredFile);
 

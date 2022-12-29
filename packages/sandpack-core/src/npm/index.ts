@@ -105,6 +105,12 @@ export async function getDependenciesFromSources(
       forceFetchDynamically
     );
 
+    console.log(
+      'getDependenciesFromSources',
+      dynamicDependencies,
+      prebundledDependencies
+    );
+
     const updateLoadScreen = () => {
       const progress = totalDependencies - remainingDependencies.length;
       const total = totalDependencies;
@@ -135,7 +141,17 @@ export async function getDependenciesFromSources(
     const prebundledPromise = Promise.all(
       Object.keys(prebundledDependencies).map(depName =>
         getPrebundledDependency(depName, depsWithNodeLibs[depName])
+          .catch(() => {
+            console.log('Failed getPrebundled, start resolveDependencyInfo', depName);
+            // If we can't find the dependency, we should try to fetch it dynamically
+            return resolveDependencyInfo(
+              depName,
+              depsWithNodeLibs[depName],
+              parsedResolutions
+            );
+          })
           .then(d => {
+            console.log('Got dep: ', depName);
             // Unfortunately we've let this through in our system, some dependencies will just be { error: string }.
             // The bug has been fixed, but dependencies have been cached, we have to filter them out and fetch them
             // dynamically.

@@ -58,7 +58,8 @@ export type ProtocolDefinition = {
 export type ProtocolCondition = (
   version: string,
   name: string,
-  useFallback: boolean
+  useFallback: boolean,
+  useLocal?: boolean
 ) => boolean;
 
 export function setContributedProtocols(newProtocols: ProtocolDefinition[]) {
@@ -76,10 +77,11 @@ export function prependToContributedProtocols(
 export function getFetchProtocol(
   depName: string,
   depVersion: string,
-  useFallback = false
+  useFallback = false,
+  useLocal = false
 ) {
   const runCondition = (p: ProtocolDefinition) =>
-    p.condition(depName, depVersion, useFallback);
+    p.condition(depName, depVersion, useFallback, useLocal);
 
   return (
     contributedProtocols.find(runCondition)?.protocol ||

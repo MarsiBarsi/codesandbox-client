@@ -2,7 +2,7 @@ import { valid, maxSatisfying } from 'semver';
 
 async function fetchWithRetries<T = any>(url: string): Promise<T> {
   let err: Error;
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 1; i++) {
     try {
       // eslint-disable-next-line
       return await fetch(url).then(x => {
@@ -44,6 +44,8 @@ const resolveVersionFromUnpkg = (
 };
 
 async function getLatestVersion(dep: string, version: string): Promise<string> {
+  console.log('getLatestVersion', dep, version);
+
   // No need to resolve absolute versions...
   if (isAbsoluteVersion(version)) {
     return version;

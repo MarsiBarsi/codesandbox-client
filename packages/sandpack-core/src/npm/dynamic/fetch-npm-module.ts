@@ -69,7 +69,8 @@ function getMeta(
   name: string,
   packageJSONPath: string | null,
   version: string,
-  useFallback = false
+  useFallback = false,
+  useLocal = false
 ): Promise<{ meta: Meta; fromCache: boolean }> {
   const [depName, depVersion] = resolveNPMAlias(name, version);
   const nameWithoutAlias = depName.replace(ALIAS_REGEX, '');
@@ -81,7 +82,7 @@ function getMeta(
     }));
   }
 
-  const protocol = getFetchProtocol(depName, depVersion, useFallback);
+  const protocol = getFetchProtocol(depName, depVersion, useFallback, useLocal);
 
   metas[id] = protocol.meta(nameWithoutAlias, depVersion).catch(e => {
     delete metas[id];
@@ -122,6 +123,25 @@ export async function downloadAllDependencyFiles(
   return null;
 }
 
+function withTimeout(promise: Promise<any>, timeout: number): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Timeout'));
+    }, timeout);
+
+    promise.then(
+      result => {
+        clearTimeout(timeoutId);
+        resolve(result);
+      },
+      error => {
+        clearTimeout(timeoutId);
+        reject(error);
+      }
+    );
+  });
+}
+
 export function downloadDependency(
   name: string,
   version: string,
@@ -145,15 +165,36 @@ export function downloadDependency(
   const nameWithoutAlias = depName.replace(ALIAS_REGEX, '');
   const protocol = getFetchProtocol(depName, depVersion);
 
-  packages[id] = protocol
-    .file(nameWithoutAlias, depVersion, relativePath)
+  console.log('First try: ', depName, depVersion, protocol);
+
+  packages[id] = withTimeout(
+    protocol.file(nameWithoutAlias, depVersion, relativePath),
+    10000
+  )
+    .then(r => {
+      console.log('First try success', depName, depVersion);
+      return r;
+    })
     .catch(async () => {
       const fallbackProtocol = getFetchProtocol(
         nameWithoutAlias,
         depVersion,
         true
       );
-      return fallbackProtocol.file(nameWithoutAlias, depVersion, relativePath);
+
+      console.log('Fallback try: ', fallbackProtocol);
+
+      return withTimeout(
+        fallbackProtocol.file(nameWithoutAlias, depVersion, relativePath),
+        5000
+      );
+    })
+    .catch(async () => {
+      const localProtocol = getFetchProtocol(depName, depVersion, false, true);
+
+      console.log('Local try: ', localProtocol);
+
+      return localProtocol.file(nameWithoutAlias, depVersion, relativePath);
     })
     .then(code => ({
       path,
@@ -380,14 +421,28 @@ export default async function fetchModule(
 
   const { packageJSONPath, version } = versionInfo;
 
-  let meta: { meta: Meta; fromCache: boolean };
+  const meta: { meta: Meta; fromCache: boolean } = await withTimeout(
+    getMeta(dependencyName, packageJSONPath, version),
+    10000
+  )
+    .then(meta => {
+      console.log('Meta success: ', dependencyName, version);
 
-  try {
-    meta = await getMeta(dependencyName, packageJSONPath, version);
-  } catch (e) {
-    // Use fallback
-    meta = await getMeta(dependencyName, packageJSONPath, version, true);
-  }
+      return meta;
+    })
+    .catch(() => {
+      console.log('Meta Fallback: ', dependencyName, version);
+      // Use fallback
+      return withTimeout(
+        getMeta(dependencyName, packageJSONPath, version, true),
+        5000
+      );
+    })
+    .catch(() => {
+      console.log('Local Fallback: ', dependencyName, version);
+      // Use local
+      return getMeta(dependencyName, packageJSONPath, version, true, true);
+    });
 
   const rootPath = packageJSONPath
     ? pathUtils.dirname(packageJSONPath)

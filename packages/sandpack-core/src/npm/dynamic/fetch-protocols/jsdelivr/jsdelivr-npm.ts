@@ -9,7 +9,7 @@ import { JSDelivrMeta, normalizeJSDelivr } from './utils';
 export class JSDelivrNPMFetcher implements FetchProtocol {
   async file(name: string, version: string, path: string): Promise<string> {
     const url = `https://cdn.jsdelivr.net/npm/${name}@${version}${path}`;
-    const result = await fetchWithRetries(url).then(x => x.text());
+    const result = await fetchWithRetries(url, 1).then(x => x.text());
 
     return result;
   }
